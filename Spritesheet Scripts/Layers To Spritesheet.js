@@ -9,21 +9,98 @@
 // Arrange layers into a sprite sheet. 
 
 function automateTask(width, height, columns) {
+	readyLayers(width, height);
+	arrangeToSpritesheet(width);
+}
+
+function maxLayerWidth() {
+	// --------------------------
+	docRef = activeDocument;
+
+	const defaultWidth = 144;
+	var currentMaxWidth = defaultWidth;
+	for (i = 0; i < docRef.artLayers.length; i++) {
+		var layer = docRef.artLayers[i];
+		currentMaxWidth = Math.max(currentMaxWidth, layer.bounds[2].as("px") - layer.bounds[0].as("px"));
+	}
+
+	return currentMaxWidth;
+}
+
+function maxLayerHeight() {
+	// --------------------------
+	docRef = activeDocument;
+
+	const defaultHeight = 144;
+	var currentMaxHeight = defaultHeight;
+	for (i = 0; i < docRef.artLayers.length; i++) {
+		var layer = docRef.artLayers[i];
+		currentMaxHeight = Math.max(currentMaxHeight, layer.bounds[3].as("px") - layer.bounds[1].as("px"));
+	}
+
+	return currentMaxHeight;
+}
+
+function readyLayers(width, height) {
 	// --------------------------
 	docRef = activeDocument;
 
 	var numLayers = docRef.artLayers.length;
-	var rows = (Math.ceil((numLayers * 1.0) / columns));
 
 	// put things in order
 	app.preferences.rulerUnits = Units.PIXELS;
 
 	// resize the canvas
-	var canvasWidth = columns * width;
-	var canvasHeight = rows * height;
+	var canvasWidth = Math.max(width, height, maxLayerWidth(), maxLayerHeight()) * 2;
+	var canvasHeight = canvasWidth;
+
+	var fillColor = new SolidColor();
+	fillColor.rgb.hexValue = "78CAF1";
 
 	docRef.resizeCanvas(canvasWidth, canvasHeight, AnchorPosition.TOPLEFT);
 
+	// move the layers around
+	for (i = 0; i < numLayers; i++) {
+		var layer = docRef.artLayers[i];
+		layer.visible = true;
+
+		// Get current position of the top-left corner of the layer
+		var currentX = layer.bounds[0].as("px");
+		var currentY = layer.bounds[1].as("px");
+
+		var shapeRef = [[0, 0], [0, width], [width, width], [width, 0]];
+
+		// Translate layer by calculated offsets
+		layer.translate(-currentX, -currentY);
+
+		// select active layer
+		activeDocument.activeLayer = layer;
+		activeDocument.selection.select(shapeRef);
+		activeDocument.selection.invert();
+		activeDocument.selection.fill(fillColor);
+		activeDocument.selection.cut();
+		activeDocument.selection.deselect();
+	}
+}
+
+function arrangeToSpritesheet(width) {
+	// --------------------------
+	docRef = activeDocument;
+	var numLayers = docRef.artLayers.length;
+
+	const columns = 4;
+	var rows = (Math.ceil((numLayers * 1.0) / columns));
+
+	// put things in order
+	app.preferences.rulerUnits = Units.PIXELS;
+
+	var currentSize = width;
+
+	// resize the canvas
+	var canvasWidth = columns * currentSize;
+	var canvasHeight = rows * currentSize;
+
+	docRef.resizeCanvas(canvasWidth, canvasHeight, AnchorPosition.TOPLEFT);
 
 	var i = 0;
 	// move the layers around
@@ -35,16 +112,16 @@ function automateTask(width, height, columns) {
 			layer.visible = true;
 
 			// Calculate target top-left position
-			var targetX = width * col;
-			var targetY = height * row;
+			var targetX = currentSize * col;
+			var targetY = currentSize * row;
 
 			// Get current position of the top-left corner of the layer
 			var currentX = layer.bounds[0].as("px");
 			var currentY = layer.bounds[1].as("px");
 
 			// Calculate offsets and round to avoid floating-point issues
-			var offsetX = Math.round(targetX - currentX);
-			var offsetY = Math.round(targetY - currentY);
+			var offsetX = Math.round(targetX - currentX) + (currentSize - (layer.bounds[2].as("px") - layer.bounds[0].as("px")));
+			var offsetY = Math.round(targetY - currentY) + (currentSize - (layer.bounds[3].as("px") - layer.bounds[1].as("px")));
 
 			// Translate layer by calculated offsets
 			layer.translate(offsetX, offsetY);
@@ -52,6 +129,11 @@ function automateTask(width, height, columns) {
 			i++;
 		}
 	}
+
+	const idealSize = 144;
+	const idealCanvasWidth = idealSize * columns;
+	const idealCanvasHeight = idealSize * rows;
+	docRef.resizeImage(idealCanvasWidth, idealCanvasHeight, docRef.resolution, ResampleMethod.PRESERVEDETAILS, 0);
 }
 
 
